@@ -46,7 +46,7 @@ export const AVAILABLE_AGENTS: AgentInfo[] = [
 const AGY_TOOLS: FunctionDeclaration[] = [
   {
     name: 'view_file',
-    description: 'Read the contents of a file in the shared workspace',
+    description: 'Read the complete contents of a file in the shared workspace',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -57,7 +57,7 @@ const AGY_TOOLS: FunctionDeclaration[] = [
   },
   {
     name: 'create_file',
-    description: 'Create a new file in the shared workspace directory',
+    description: 'Create or overwrite a file in the shared workspace directory',
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -211,7 +211,6 @@ export class AgentEngine {
 
     const activeKey = this.getApiKey();
 
-    // Check if API key is provided
     if (!activeKey) {
       messageState.content = `⚠️ **Gemini API Key Required**\n\nNo API key is configured for **${agent.handle}**. Click the **🔑 Set API Key** button in the top navbar or set the \`GEMINI_API_KEY\` environment variable to enable live LLM responses and tool execution.`;
       messageState.isStreaming = false;
@@ -219,7 +218,6 @@ export class AgentEngine {
       return messageState;
     }
 
-    // Autonomous AGY Multi-Turn Execution Loop (Up to 10 Turns)
     try {
       const ai = new GoogleGenAI({ apiKey: activeKey });
 
@@ -235,10 +233,10 @@ Current Workspace Codebase:
 ${fileContextSnippet}
 
 AUTONOMOUS AGENT DIRECTIVES:
-1. You are equipped with real tools: view_file, create_file, edit_file, run_command, git_commit, generate_diagram.
+1. You have tools: view_file, create_file, edit_file, run_command, git_commit, generate_diagram.
 2. DO NOT just say what code to write — USE YOUR TOOLS to create files, execute scripts, check results, and fix any errors!
-3. If a command fails or has a bug, inspect the error output, edit the file using edit_file, and run_command again to verify the fix!
-4. Always verify your changes work by executing real commands (e.g. python script.py, node file.js, npm test).
+3. IMPORTANT: When using edit_file, ensure the target string matches existing file content EXACTLY. If edit_file fails, use view_file to check exact contents or use create_file to overwrite the file cleanly.
+4. If a command fails or has a bug, inspect the error output, fix the file, and run_command again to verify the fix!
 5. Explain your reasoning clearly and summarize the final verified results for the team.`;
 
       const recentChatSummary = conversationHistory
@@ -271,26 +269,22 @@ AUTONOMOUS AGENT DIRECTIVES:
         const parts = candidate?.content?.parts || [];
         const functionCalls = parts.filter(p => p.functionCall).map(p => p.functionCall!);
 
-        // Capture model text/thought
         const textResponse = response.text || '';
         if (textResponse) {
           messageState.content = textResponse;
           reasoningTraces.push(`Turn ${currentTurn}: ${textResponse}`);
         }
 
-        // If no tool calls, agent has completed its task!
         if (functionCalls.length === 0) {
           break;
         }
 
-        // Push model response to history
         if (candidate?.content) {
           conversationContents.push(candidate.content);
         }
 
         const functionResponses: any[] = [];
 
-        // Process all tool calls in parallel/sequence
         for (const fc of functionCalls) {
           if (!fc || !fc.name) continue;
           const toolName = fc.name as any;
@@ -310,31 +304,40 @@ AUTONOMOUS AGENT DIRECTIVES:
           if (toolName === 'view_file') {
             const f = fileSystemStore.getFile(args.path);
             toolResult = f ? `Content of ${args.path}:\n${f.content}` : `File '${args.path}' not found in workspace`;
+            toolExec.status = 'success';
           } else if (toolName === 'create_file') {
             fileSystemStore.updateFile(args.path, args.content, agent.name);
-            toolResult = `Created file '${args.path}' (${args.content.length} bytes)`;
+            toolResult = `Created/overwrote file '${args.path}' (${args.content.length} bytes)`;
+            toolExec.status = 'success';
           } else if (toolName === 'edit_file') {
             const existing = fileSystemStore.getFile(args.path);
-            if (existing) {
+            if (!existing) {
+              toolResult = `Error: File '${args.path}' not found in workspace. Use create_file to create it.`;
+              toolExec.status = 'failed';
+            } else if (!existing.content.includes(args.target)) {
+              toolResult = `Error: Target string not found in '${args.path}'. Please use view_file to check exact contents or create_file to overwrite.`;
+              toolExec.status = 'failed';
+            } else {
               const oldContent = existing.content;
               const newContent = oldContent.replace(args.target, args.replacement);
               fileSystemStore.updateFile(args.path, newContent, agent.name);
               toolExec.diff = { path: args.path, oldContent: args.target, newContent: args.replacement };
               toolResult = `Successfully edited '${args.path}'`;
-            } else {
-              toolResult = `File '${args.path}' not found for edit`;
+              toolExec.status = 'success';
             }
           } else if (toolName === 'run_command') {
             toolResult = await executeRealShellCommand(args.command);
+            toolExec.status = 'success';
           } else if (toolName === 'git_commit') {
             const commit = fileSystemStore.createGitCommit(args.message, agent.name);
             toolResult = `Git commit ${commit.hash}: "${commit.message}" (${commit.filesChanged} files updated)`;
+            toolExec.status = 'success';
           } else if (toolName === 'generate_diagram') {
             messageState.architectureDiagram = args.mermaid_spec;
             toolResult = `Generated Mermaid architecture diagram`;
+            toolExec.status = 'success';
           }
 
-          toolExec.status = 'success';
           toolExec.result = toolResult;
           messageState.toolExecutions = [...messageState.toolExecutions!];
           onUpdate(messageState);
@@ -345,7 +348,6 @@ AUTONOMOUS AGENT DIRECTIVES:
           });
         }
 
-        // Push function responses to history for next turn
         conversationContents.push({
           role: 'user',
           parts: functionResponses.map(fr => ({ functionResponse: fr }))
@@ -356,7 +358,6 @@ AUTONOMOUS AGENT DIRECTIVES:
         messageState.reasoningTrace = reasoningTraces.join('\n');
       }
 
-      // Check if text response contains mermaid diagram block
       const mermaidMatch = (messageState.content || '').match(/```mermaid([\s\S]*?)```/);
       if (mermaidMatch && mermaidMatch[1]) {
         messageState.architectureDiagram = mermaidMatch[1].trim();
