@@ -131,7 +131,7 @@ class Bunker:
 
 
 if __name__ == "__main__":
-    main()
+
 KER = "[94m"    # Bunkers (Blue)
 COLOR_BORDER = "[90m"    # Border (Dark Grey)
 COLOR_SCORE = "[97m"     # Score/Info (White)
