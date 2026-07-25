@@ -1,0 +1,27 @@
+[
+    {
+        "player_name": "TestPlayer",
+        "score": 9999,
+        "timestamp": "2026-07-25T11:14:11.778246"
+    },
+    {
+        "player_name": "Player6",
+        "score": 1000,
+        "timestamp": "2026-07-25T11:14:11.779609"
+    },
+    {
+        "player_name": "Player7",
+        "score": 900,
+        "timestamp": "2026-07-25T11:14:11.779987"
+    },
+    {
+        "player_name": "Player8",
+        "score": 800,
+        "timestamp": "2026-07-25T11:14:11.780329"
+    },
+    {
+        "player_name": "Player9",
+        "score": 700,
+        "timestamp": "2026-07-25T11:14:11.780637"
+    }
+]

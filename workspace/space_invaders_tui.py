@@ -3,6 +3,7 @@ import random
 import time
 import sys
 import argparse
+import datetime
 import score_manager
 import termios
 import tty
@@ -244,14 +245,30 @@ class Renderer:
         score_y = self.height // 2 + 1
 
         sys.stdout.write(f"\033[{game_over_y};{game_over_x}H{COLOR_GAME_OVER}{game_over_text}{COLOR_RESET}\n")
-        sys.stdout.write(f"\033[{score_y};{score_x}H{COLOR_SCORE}{score_text}{COLOR_RESET}\n")
+    def display_high_scores(self, high_scores):
+        # Screen is already cleared by draw_game_over
+        title = "HIGH SCORES"
+        title_x = (self.width - len(title)) // 2
+        sys.stdout.write(f"\033[2;{title_x}H{COLOR_SCORE}{title}{COLOR_RESET}")
+
+        start_y = 4
+        for i, entry in enumerate(high_scores):
+            # Format timestamp nicely, e.g., 'YYYY-MM-DD HH:MM'
+            # Assuming timestamp is in ISO format
+            dt_object = datetime.datetime.fromisoformat(entry['timestamp'])
+            formatted_timestamp = dt_object.strftime("%Y-%m-%d %H:%M")
+            
+            score_line = f"{i+1}. {entry['player_name']} - {entry['score']} ({formatted_timestamp})"
+            score_line_x = (self.width - len(score_line)) // 2
+            sys.stdout.write(f"\033[{start_y + i};{score_line_x}H{COLOR_SCORE}{score_line}{COLOR_RESET}")
+        sys.stdout.write("\n" * 2) # Add some newlines at the end
         sys.stdout.flush()
 
-
 class GameEngine:
-    def __init__(self, width, height):
+    def __init__(self, width=60, height=20, demo_mode=False):
         self.width = width
         self.height = height
+        self.demo_mode = demo_mode
         self.player = PlayerShip(width // 2, height - 2)
         self.alien_army = AlienArmy()
         self.projectile_manager = ProjectileManager()
@@ -263,20 +280,24 @@ class GameEngine:
         self.old_settings = None
         
     def _setup_input(self):
-        self.old_settings = termios.tcgetattr(sys.stdin)
-        tty.setcbreak(sys.stdin.fileno())
-        # Set stdin to non-blocking
-        fd = sys.stdin.fileno()
-        fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-        fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
-
-    def _restore_input(self):
-        if self.old_settings:
-            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
-            # Restore blocking behavior
+        if self.demo_mode or not sys.stdin.isatty():
+            return
+        try:
+            self.old_settings = termios.tcgetattr(sys.stdin)
+            tty.setcbreak(sys.stdin.fileno())
             fd = sys.stdin.fileno()
             fl = fcntl.fcntl(fd, fcntl.F_GETFL)
-            fcntl.fcntl(fd, fcntl.F_SETFL, fl & ~os.O_NONBLOCK)
+            fcntl.fcntl(fd, fcntl.F_SETFL, fl | os.O_NONBLOCK)
+        except Exception:
+            pass
+
+    def _restore_input(self):
+        if self.demo_mode or not self.old_settings:
+            return
+        try:
+            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.old_settings)
+        except Exception:
+            pass
 
     def handle_input(self):
         try:
@@ -388,6 +409,8 @@ class GameEngine:
             self._setup_input()
 
         frame_counter = 0
+        player_name_for_score = "Player" # Default name
+
         try:
             while not self.game_over:
                 if not demo_mode:
@@ -405,37 +428,17 @@ class GameEngine:
             self.renderer.clear_screen()
             if not demo_mode:
                 self._restore_input()
+                # Now that input is restored to blocking, we can ask for name
+                if self.game_over:
+                    player_name_for_score = input("Enter your name for the high score: ") or "Player"
+            
             if self.game_over:
                 self.renderer.draw_game_over(self.player.score)
-                
-                # Prompt for player name and save score
-                player_name = input("Enter your name for the high score: ") # This will block in non-blocking input mode
-                self._restore_input() # Restore blocking input temporarily for name input
-                player_name = input("Enter your name for the high score: ")
-                score_manager.add_score(player_name, self.player.score)
-                self._setup_input() # Re-enable non-blocking input
-                
+                score_manager.add_score(player_name_for_score, self.player.score)
                 high_scores = score_manager.get_high_scores()
                 self.renderer.display_high_scores(high_scores)
                 time.sleep(5) # Display high scores for 5 seconds
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Terminal Space Invaders")
-    parser.add_argument("--demo", action="store_true", help="Run in demo mode for a fixed number of frames")
-    parser.add_argument("--run-tests", action="store_true", help="Run unit tests")
-    args = parser.parse_args()
-
-    if args.run_tests:
-        game_engine = GameEngine(GRID_WIDTH, GRID_HEIGHT)
-        game_engine._run_tests()
-        sys.exit(0)
-    
-    game = GameEngine(GRID_WIDTH, GRID_HEIGHT)
-    if args.demo:
-        game.run(demo_mode=True, demo_frames=DEMO_FRAMES)
-        sys.exit(0)
-    else:
-        game.run()
 
 def run_tests():
     print("Running unit tests...")
@@ -445,19 +448,84 @@ def run_tests():
     test_alien_hit_detection()
     # Boss spawning test (Invader types)
     test_invader_type_spawning()
+    # Score manager integration test
+    test_score_manager_integration()
     print("All tests passed!")
+
+def test_score_manager_integration():
+    print("Testing score manager integration...")
+    # Clear existing scores to ensure a clean test environment
+    if os.path.exists(score_manager.SCORES_FILE):
+        os.remove(score_manager.SCORES_FILE)
+    
+    player_name = "TestPlayer"
+    test_score = 9999
+    
+    # Simulate adding a score
+    score_manager.add_score(player_name, test_score)
+    
+    # Retrieve high scores
+    high_scores = score_manager.get_high_scores()
+    
+    assert len(high_scores) > 0, "High scores list is empty after adding a score."
+    
+    # Check if the added score is present and correct
+    found_score = False
+    for entry in high_scores:
+        if entry["player_name"] == player_name and entry["score"] == test_score:
+            found_score = True
+            break
+    
+    assert found_score, f"Added score for {player_name} with {test_score} not found in high scores."
+
+    # Test that only top 5 scores are kept. Add more than 5 scores.
+    # We need to make sure the scores are distinct so the order is predictable.
+    # Scores added in descending order to ensure our test_score remains at the top
+    score_manager.add_score("Player6", 1000)
+    score_manager.add_score("Player7", 900)
+    score_manager.add_score("Player8", 800)
+    score_manager.add_score("Player9", 700)
+    score_manager.add_score("Player10", 600) # This should push one out if test_score is already in
+
+    high_scores_after_many = score_manager.get_high_scores()
+    assert len(high_scores_after_many) <= 5, f"Expected max 5 scores, got {len(high_scores_after_many)}"
+
+    # Verify that the test_score is still in the top 5
+    found_test_score_in_top_5 = False
+    for entry in high_scores_after_many:
+        if entry["player_name"] == player_name and entry["score"] == test_score:
+            found_test_score_in_top_5 = True
+            break
+    assert found_test_score_in_top_5, f"Original test score {test_score} was not retained in top 5."
+
+    print("Score manager integration tests passed.")
+
+
 
 def test_player_ship_shield_mechanics():
     print("Testing PlayerShip shield/lives mechanics...")
-    player = PlayerShip(10, 10)
+    game_engine = GameEngine(GRID_WIDTH, GRID_HEIGHT)
+    player = game_engine.player
+    initial_shield = player.shield_energy
     initial_lives = player.lives
-    
-    # Simulate taking damage
-    player.lives -= 1 
-    assert player.lives == initial_lives - 1, f"Expected {initial_lives - 1} lives, got {player.lives}"
 
-    player.lives -= 1
-    assert player.lives == initial_lives - 2, f"Expected {initial_lives - 2} lives, got {player.lives}"
+    # Test shield taking damage
+    for _ in range(initial_shield):
+        ip = Projectile(player.x, player.y, MISSILE_SPEED, INVADER_MISSILE, COLOR_MISSILE_INVADER, "invader")
+        game_engine.projectile_manager.add_projectile(ip)
+        game_engine.check_collisions()
+        # Projectile should be marked for removal after collision
+        assert ip.y > GRID_HEIGHT, "Invader projectile not marked for removal after shield hit."
+
+    assert player.shield_energy == 0, f"Expected shield energy to be 0, got {player.shield_energy}"
+    assert player.lives == initial_lives, f"Expected lives to be {initial_lives}, got {player.lives}"
+
+    # Test lives taking damage after shield is depleted
+    ip = Projectile(player.x, player.y, MISSILE_SPEED, INVADER_MISSILE, COLOR_MISSILE_INVADER, "invader")
+    game_engine.projectile_manager.add_projectile(ip)
+    game_engine.check_collisions()
+    assert player.lives == initial_lives - 1, f"Expected lives to be {initial_lives - 1}, got {player.lives}"
+    assert ip.y > GRID_HEIGHT, "Invader projectile not marked for removal after direct hit to player."
 
     print("PlayerShip shield/lives mechanics tests passed.")
 
@@ -471,22 +539,37 @@ def test_alien_hit_detection():
     # Ensure there's at least one invader for testing
     assert len(alien_army.invaders) > 0, "No invaders to test hit detection."
 
+    # Test hitting a Dreadnought Boss (health 5)
+    # Find a Dreadnought boss (type 'M')
+    dreadnought_invader = None
+    for invader in alien_army.invaders:
+        if invader.invader_type == 'M':
+            dreadnought_invader = invader
+            break
+    assert dreadnought_invader is not None, "No Dreadnought invader found for testing."
+
+    initial_dreadnought_health = dreadnought_invader.health
     initial_score = player.score
-    initial_invader_count = len(alien_army.get_alive_invaders())
+    initial_alive_invaders = len(alien_army.get_alive_invaders())
 
-    # Create a player projectile at an invader's location
-    target_invader = alien_army.get_alive_invaders()[0]
-    pp = Projectile(target_invader.x, target_invader.y, -MISSILE_SPEED, PLAYER_MISSILE, COLOR_MISSILE_PLAYER, "player")
+    # Simulate hitting the Dreadnought multiple times
+    for i in range(initial_dreadnought_health - 1):
+        pp = Projectile(dreadnought_invader.x, dreadnought_invader.y, -MISSILE_SPEED, PLAYER_MISSILE, COLOR_MISSILE_PLAYER, "player")
+        projectile_manager.add_projectile(pp)
+        game_engine.check_collisions()
+        assert dreadnought_invader.health == initial_dreadnought_health - (i + 1), f"Dreadnought health incorrect after {i+1} hits."
+        assert dreadnought_invader.alive, "Dreadnought died before health reached zero."
+        assert pp.y == -1, "Player projectile not marked for removal after hitting Dreadnought."
+
+    # Final hit to destroy the Dreadnought
+    pp = Projectile(dreadnought_invader.x, dreadnought_invader.y, -MISSILE_SPEED, PLAYER_MISSILE, COLOR_MISSILE_PLAYER, "player")
     projectile_manager.add_projectile(pp)
-
     game_engine.check_collisions()
 
-    assert not target_invader.alive, "Invader was not marked as dead after collision."
-    assert player.score > initial_score, "Player score did not increase after hitting invader."
-    assert len(alien_army.get_alive_invaders()) == initial_invader_count - 1, "Invader was not removed from alive invaders list."
-    
-    # Check if projectile is marked for removal
-    assert pp.y == -1, "Player projectile not marked for removal after collision."
+    assert not dreadnought_invader.alive, "Dreadnought was not marked as dead after final hit."
+    assert player.score == initial_score + dreadnought_invader.points_value, "Player score did not increase correctly after destroying Dreadnought."
+    assert len(alien_army.get_alive_invaders()) == initial_alive_invaders - 1, "Dreadnought not removed from alive invaders list."
+    assert pp.y == -1, "Player projectile not marked for removal after final hit on Dreadnought."
     
     print("Alien hit detection tests passed.")
 
@@ -522,3 +605,18 @@ def test_invader_type_spawning():
     assert invader_counts['M'] == INVADER_COLS, f"Expected {INVADER_COLS} 'M' invaders, got {invader_counts['M']}"
 
     print("Invader type spawning tests passed.")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Space Invaders TUI Game")
+    parser.add_argument("--demo", action="store_true", help="Run in automated demo mode")
+    parser.add_argument("--run-tests", action="store_true", help="Run test suite")
+    args = parser.parse_args()
+
+    if args.run_tests:
+        run_tests()
+    elif args.demo:
+        game = GameEngine(demo_mode=True)
+        game.run()
+    else:
+        game = GameEngine(demo_mode=False)
+        game.run()
