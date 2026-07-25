@@ -4,39 +4,8 @@ export class GitHubService {
   private repos: Map<string, GitHubRepo> = new Map();
 
   constructor() {
-    // Default starter repos for testing/demo
-    const defaultRepos: GitHubRepo[] = [
-      {
-        id: 'repo-1',
-        owner: 'jlopezarriaza',
-        repo: 'multiplayer-coding-agent',
-        branch: 'main',
-        url: 'https://github.com/jlopezarriaza/multiplayer-coding-agent',
-        description: 'Multiplayer AI Coding Agent with real-time room collaboration & @agent mentions',
-        stars: 142,
-        forks: 28,
-        openIssues: 3,
-        defaultBranch: 'main',
-        isSynced: true
-      },
-      {
-        id: 'repo-2',
-        owner: 'facebook',
-        repo: 'react',
-        branch: 'main',
-        url: 'https://github.com/facebook/react',
-        description: 'The library for web and native user interfaces',
-        stars: 220000,
-        forks: 45000,
-        openIssues: 920,
-        defaultBranch: 'main',
-        isSynced: false
-      }
-    ];
-
-    for (const r of defaultRepos) {
-      this.repos.set(r.id, r);
-    }
+    // Start clean with no pre-loaded sample repositories
+    this.repos.clear();
   }
 
   public getRepos(): GitHubRepo[] {
@@ -74,9 +43,9 @@ export class GitHubService {
         branch: 'main',
         url: `https://github.com/${owner}/${repo}`,
         description: `Imported repository ${owner}/${repo}`,
-        stars: 42,
-        forks: 5,
-        openIssues: 1,
+        stars: 0,
+        forks: 0,
+        openIssues: 0,
         defaultBranch: 'main',
         isSynced: true
       };

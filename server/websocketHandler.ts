@@ -25,32 +25,18 @@ export class WebSocketHandler {
   private seedRoomMessages(roomId: string) {
     const initialMessages: Message[] = [
       {
-        id: 'msg-seed-1',
+        id: 'msg-welcome-1',
         roomId,
         sender: {
-          id: 'user-alice',
-          name: 'Alice (Frontend Lead)',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alice',
-          role: 'human',
-          color: '#ec4899'
+          id: 'user-system',
+          name: 'Agenty Room Engine',
+          avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=system&backgroundColor=6366f1',
+          role: 'agent',
+          color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40'
         },
-        content: `Hey @Bob! I was looking at our architecture for the multiplayer state sync engine. We need a way to track agent actions live across participants.`,
-        timestamp: new Date(Date.now() - 3600000 * 2).toISOString(),
+        content: `👋 **Welcome to your clean multiplayer workspace!**\n\n- **Chat**: Discuss requirements with your team in this room.\n- **Agents**: Tag \`@gemini\`, \`@architect\`, \`@reviewer\`, or \`@debugger\` (press **Tab** to autocomplete).\n- **Files & Repos**: Create files via the File Explorer **\`+\`** button or connect a GitHub repo using **\`+ Change\`** in the top navbar.`,
+        timestamp: new Date().toISOString(),
         mentions: []
-      },
-      {
-        id: 'msg-seed-2',
-        roomId,
-        sender: {
-          id: 'user-bob',
-          name: 'Bob (Backend Eng)',
-          avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Bob',
-          role: 'human',
-          color: '#3b82f6'
-        },
-        content: `That sounds right! Let's check with @architect first to get a visual diagram, and then tag @gemini to implement it in our shared repository.`,
-        timestamp: new Date(Date.now() - 3600000 * 1.8).toISOString(),
-        mentions: ['@architect', '@gemini']
       }
     ];
     this.messagesByRoom.set(roomId, initialMessages);
