@@ -87,7 +87,12 @@ export function App() {
           break;
 
         case 'NEW_MESSAGE':
-          setMessages((prev) => [...prev, payload.message]);
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === payload.message.id)) {
+              return prev;
+            }
+            return [...prev, payload.message];
+          });
           break;
 
         case 'AGENT_STREAM_UPDATE': {

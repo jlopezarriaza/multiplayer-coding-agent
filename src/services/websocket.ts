@@ -10,6 +10,21 @@ class WebSocketClient {
   private currentRoomId: string = 'room-dev-1';
 
   public connect(user: User, roomId: string = 'room-dev-1') {
+    // Avoid creating duplicate WebSocket connections if already connected with same user & room
+    if (
+      this.ws &&
+      (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) &&
+      this.currentUser?.id === user.id &&
+      this.currentRoomId === roomId
+    ) {
+      return;
+    }
+
+    if (this.ws) {
+      this.ws.onclose = null;
+      this.ws.close();
+    }
+
     this.currentUser = user;
     this.currentRoomId = roomId;
 
@@ -39,6 +54,7 @@ class WebSocketClient {
     this.ws.onclose = () => {
       console.warn('⚠️ WebSocket connection closed. Attempting reconnect in 3s...');
       this.notifyListeners('CONNECTED', { connected: false });
+      if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
       this.reconnectTimer = setTimeout(() => {
         if (this.currentUser) {
           this.connect(this.currentUser, this.currentRoomId);
