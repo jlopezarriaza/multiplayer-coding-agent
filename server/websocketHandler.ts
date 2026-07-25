@@ -34,7 +34,7 @@ export class WebSocketHandler {
           role: 'agent',
           color: 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40'
         },
-        content: `👋 **Welcome to your clean multiplayer workspace!**\n\n- **Chat**: Discuss requirements with your team in this room.\n- **Agents**: Tag \`@gemini\`, \`@architect\`, \`@reviewer\`, or \`@debugger\` (press **Tab** to autocomplete).\n- **Files & Repos**: Create files via the File Explorer **\`+\`** button or connect a GitHub repo using **\`+ Change\`** in the top navbar.`,
+        content: `👋 **Welcome to your clean multiplayer workspace!**\n\n- **Chat**: Discuss requirements with your team in this room.\n- **Agents**: Tag \`@gemini\`, \`@architect\`, \`@reviewer\`, or \`@debugger\` (press **Tab** to autocomplete).\n- **Agent Handoff**: Agents can tag each other (e.g. \`@architect\` tags \`@gemini\` -> \`@reviewer\`).\n- **Files & Repos**: Create files via the File Explorer **\`+\`** button or connect a GitHub repo.`,
         timestamp: new Date().toISOString(),
         mentions: []
       }
@@ -60,6 +60,54 @@ export class WebSocketHandler {
     });
   }
 
+  private async triggerAgentHandoffChain(
+    agents: ReturnType<typeof agentEngine.detectMentions>,
+    triggerMessage: Message,
+    roomId: string,
+    depth: number = 0
+  ) {
+    const MAX_HANDOFF_DEPTH = 3;
+    if (depth >= MAX_HANDOFF_DEPTH) return;
+
+    const roomMsgs = this.messagesByRoom.get(roomId) || [];
+
+    for (const agent of agents) {
+      if (triggerMessage.sender.role === 'agent' && triggerMessage.sender.handle === agent.handle) {
+        continue;
+      }
+
+      const finalAgentMsg = await agentEngine.processAgentResponse(
+        agent,
+        triggerMessage,
+        roomMsgs,
+        (partialMsg) => {
+          this.broadcastToRoom(roomId, {
+            type: 'AGENT_STREAM_UPDATE',
+            payload: { message: partialMsg }
+          });
+          this.broadcastToRoom(roomId, {
+            type: 'WORKSPACE_FILES_UPDATE',
+            payload: {
+              files: fileSystemStore.getTree(),
+              allFileObjects: fileSystemStore.getAllFiles(),
+              commits: fileSystemStore.getCommits()
+            }
+          });
+        }
+      );
+
+      roomMsgs.push(finalAgentMsg);
+      this.messagesByRoom.set(roomId, roomMsgs);
+
+      // Detect agent-to-agent mentions in the output content
+      const nextAgents = agentEngine.detectMentions(finalAgentMsg.content).filter(a => a.handle !== agent.handle);
+      if (nextAgents.length > 0) {
+        console.log(`🔄 Agent Handoff Chain (Depth ${depth + 1}): ${agent.handle} -> ${nextAgents.map(a => a.handle).join(', ')}`);
+        this.triggerAgentHandoffChain(nextAgents, finalAgentMsg, roomId, depth + 1);
+      }
+    }
+  }
+
   private init() {
     this.wss.on('connection', (ws: WebSocket) => {
       let clientConnection: ClientConnection | null = null;
@@ -75,14 +123,12 @@ export class WebSocketHandler {
               clientConnection = { ws, user, roomId };
               this.clients.add(clientConnection);
 
-              // Register room user presence
               if (!this.activeUsersByRoom.has(roomId)) {
                 this.activeUsersByRoom.set(roomId, new Map());
               }
               const roomUsers = this.activeUsersByRoom.get(roomId)!;
               roomUsers.set(user.id, user);
 
-              // Send initial state sync to joining client
               ws.send(JSON.stringify({
                 type: 'ROOM_STATE_SYNC',
                 payload: {
@@ -98,7 +144,6 @@ export class WebSocketHandler {
                 }
               }));
 
-              // Broadcast user presence update to room
               this.broadcastToRoom(roomId, {
                 type: 'USER_PRESENCE_UPDATE',
                 payload: { activeUsers: Array.from(roomUsers.values()) }
@@ -110,49 +155,19 @@ export class WebSocketHandler {
               const { message } = payload as { message: Message };
               const roomId = message.roomId || 'room-dev-1';
 
-              // Store human message
               const roomMsgs = this.messagesByRoom.get(roomId) || [];
               roomMsgs.push(message);
               this.messagesByRoom.set(roomId, roomMsgs);
 
-              // Broadcast message to room participants
               this.broadcastToRoom(roomId, {
                 type: 'NEW_MESSAGE',
                 payload: { message }
               });
 
-              // Check for agent mentions
+              // Check for agent mentions & trigger handoff chain
               const mentionedAgents = agentEngine.detectMentions(message.content);
-
               if (mentionedAgents.length > 0) {
-                for (const agent of mentionedAgents) {
-                  // Trigger agent processing loop
-                  agentEngine.processAgentResponse(
-                    agent,
-                    message,
-                    roomMsgs,
-                    (partialMsg) => {
-                      // Broadcast streaming partial update
-                      this.broadcastToRoom(roomId, {
-                        type: 'AGENT_STREAM_UPDATE',
-                        payload: { message: partialMsg }
-                      });
-
-                      // Sync updated files tree if files changed
-                      this.broadcastToRoom(roomId, {
-                        type: 'WORKSPACE_FILES_UPDATE',
-                        payload: {
-                          files: fileSystemStore.getTree(),
-                          allFileObjects: fileSystemStore.getAllFiles(),
-                          commits: fileSystemStore.getCommits()
-                        }
-                      });
-                    }
-                  ).then((finalAgentMsg) => {
-                    roomMsgs.push(finalAgentMsg);
-                    this.messagesByRoom.set(roomId, roomMsgs);
-                  });
-                }
+                this.triggerAgentHandoffChain(mentionedAgents, message, roomId, 0);
               }
               break;
             }
@@ -214,7 +229,7 @@ export class WebSocketHandler {
             }
 
             case 'CONNECT_REPO': {
-              const { owner, repo, branch } = payload as GitHubRepo;
+              const { owner, repo } = payload as GitHubRepo;
               await githubService.fetchRepoDetails(owner, repo);
               this.broadcastToRoom(payload.roomId || 'room-dev-1', {
                 type: 'REPOS_UPDATE',

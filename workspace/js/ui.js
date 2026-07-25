@@ -10,7 +10,9 @@ export class UIManager {
         this.toolbar = document.querySelector('.toolbar');
         this.colorPicker = document.getElementById('color-picker');
         this.brushSizeInput = document.getElementById('brush-size');
-        this.colorSwatches = document.querySelectorAll('.color-swatch');
+        this.colorSwatches.forEach(swatch => {
+            swatch.addEventListener('click', this.handleColorSwatchClick);
+        });
         this.fillShapeButton = document.getElementById('fill-shape');
         this.undoButton = document.getElementById('undo');
         this.redoButton = document.getElementById('redo');
@@ -26,7 +28,9 @@ export class UIManager {
     attachEventListeners() {
         this.toolbar.addEventListener('click', this.handleToolbarClick);
         this.colorPicker.addEventListener('input', this.handleColorPickerChange);
-        this.brushSizeInput.addEventListener('input', this.handleBrushSizeChange);
+        this.colorSwatches.forEach(swatch => {
+            swatch.addEventListener('click', this.handleColorSwatchClick);
+        });
         this.fillShapeButton.addEventListener('click', this.handleFillShapeToggle);
         this.undoButton.addEventListener('click', this.handleUndo);
         this.redoButton.addEventListener('click', this.handleRedo);
@@ -125,8 +129,17 @@ export class UIManager {
         }
     }
 
-    // Helper to convert RGB to Hex for consistent comparison
-    rgbToHex(rgb) {
+
+    handleColorSwatchClick = (e) => {
+        const color = e.target.dataset.color;
+        if (color) {
+            this.appState.currentColor = color;
+            this.updateColorSwatches(color);
+            this.colorPicker.value = color; // Update color picker as well
+            this.canvasManager.setDrawingStyle();
+        }
+    };
+
         if (rgb.startsWith('#')) return rgb.toLowerCase();
 
         const parts = rgb.match(/^rgb\((\d+),\s*(\d+),\s*(\d+)\)$/);

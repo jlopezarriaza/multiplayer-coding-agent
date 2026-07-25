@@ -21,8 +21,8 @@ export class CanvasManager {
     resizeCanvas() {
         // If canvas size is set via CSS, ensure internal resolution matches
         // For now, we use fixed sizes from HTML, so this is a placeholder
-        // this.canvas.width = this.canvas.offsetWidth;
-        // this.canvas.height = this.canvas.offsetHeight;
+        this.canvas.width = this.canvas.offsetWidth;
+        this.canvas.height = this.canvas.offsetHeight;
     }
 
     addEventListeners() {
