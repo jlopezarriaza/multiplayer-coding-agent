@@ -1,45 +1,107 @@
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { SharedFile, GitCommitLog } from '../src/types/index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+export const WORKSPACE_DIR = path.join(__dirname, '../workspace');
 
 class FileSystemStore {
   private files: Map<string, SharedFile> = new Map();
   private commits: GitCommitLog[] = [];
 
   constructor() {
-    this.seedInitialWorkspace();
+    this.ensureWorkspaceDir();
+    this.syncFromDisk();
   }
 
-  private seedInitialWorkspace() {
-    // Start every session clean with no pre-loaded sample files
+  public ensureWorkspaceDir() {
+    if (!fs.existsSync(WORKSPACE_DIR)) {
+      fs.mkdirSync(WORKSPACE_DIR, { recursive: true });
+    }
+  }
+
+  public syncFromDisk() {
     this.files.clear();
-    this.commits = [];
+    this.readDirRecursive(WORKSPACE_DIR, '');
   }
 
-  public getFile(path: string): SharedFile | undefined {
-    return this.files.get(path);
+  private readDirRecursive(dir: string, relativePath: string) {
+    if (!fs.existsSync(dir)) return;
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (entry.name.startsWith('.') || entry.name === 'node_modules') continue;
+
+      const relPath = relativePath ? `${relativePath}/${entry.name}` : entry.name;
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        this.readDirRecursive(fullPath, relPath);
+      } else {
+        try {
+          const content = fs.readFileSync(fullPath, 'utf-8');
+          this.files.set(relPath, {
+            path: relPath,
+            name: entry.name,
+            content,
+            type: 'file',
+            language: this.detectLanguage(entry.name),
+            lastModifiedBy: 'workspace',
+            lastModifiedAt: new Date().toISOString(),
+            gitStatus: 'unmodified'
+          });
+        } catch (err) {
+          console.error(`Error reading ${fullPath}:`, err);
+        }
+      }
+    }
+  }
+
+  public getFile(relPath: string): SharedFile | undefined {
+    this.syncFromDisk();
+    return this.files.get(relPath);
   }
 
   public getAllFiles(): SharedFile[] {
+    this.syncFromDisk();
     return Array.from(this.files.values());
   }
 
-  public updateFile(path: string, content: string, modifiedBy: string): SharedFile {
-    const existing = this.files.get(path);
+  public updateFile(relPath: string, content: string, modifiedBy: string): SharedFile {
+    this.ensureWorkspaceDir();
+    const fullPath = path.join(WORKSPACE_DIR, relPath);
+    const parentDir = path.dirname(fullPath);
+
+    if (!fs.existsSync(parentDir)) {
+      fs.mkdirSync(parentDir, { recursive: true });
+    }
+
+    const existing = this.files.get(relPath);
+    fs.writeFileSync(fullPath, content, 'utf-8');
+
     const updated: SharedFile = {
-      path,
-      name: path.split('/').pop() || path,
+      path: relPath,
+      name: relPath.split('/').pop() || relPath,
       content,
       type: 'file',
-      language: existing?.language || this.detectLanguage(path),
+      language: existing?.language || this.detectLanguage(relPath),
       lastModifiedBy: modifiedBy,
       lastModifiedAt: new Date().toISOString(),
       gitStatus: existing ? 'modified' : 'added'
     };
-    this.files.set(path, updated);
+
+    this.files.set(relPath, updated);
     return updated;
   }
 
-  public deleteFile(path: string): boolean {
-    return this.files.delete(path);
+  public deleteFile(relPath: string): boolean {
+    const fullPath = path.join(WORKSPACE_DIR, relPath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+    return this.files.delete(relPath);
   }
 
   public createGitCommit(message: string, author: string): GitCommitLog {
@@ -52,7 +114,6 @@ class FileSystemStore {
       filesChanged: modifiedCount || 1
     };
 
-    // Reset git statuses to unmodified
     for (const file of this.files.values()) {
       file.gitStatus = 'unmodified';
     }
@@ -66,6 +127,7 @@ class FileSystemStore {
   }
 
   public searchCode(query: string): { path: string; matches: { line: number; text: string }[] }[] {
+    this.syncFromDisk();
     const results: { path: string; matches: { line: number; text: string }[] }[] = [];
     const qLower = query.toLowerCase();
 
@@ -98,11 +160,13 @@ class FileSystemStore {
       case 'py': return 'python';
       case 'html': return 'html';
       case 'css': return 'css';
+      case 'sh': return 'bash';
       default: return 'text';
     }
   }
 
   public getTree(): SharedFile[] {
+    this.syncFromDisk();
     const fileList = Array.from(this.files.values());
     const tree: SharedFile[] = [];
     const folderMap = new Map<string, SharedFile>();
@@ -112,7 +176,6 @@ class FileSystemStore {
       if (parts.length === 1) {
         tree.push(file);
       } else {
-        // Build nested directories
         let currentPath = '';
         for (let i = 0; i < parts.length - 1; i++) {
           const folderName = parts[i];

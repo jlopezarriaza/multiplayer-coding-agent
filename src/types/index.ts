@@ -72,6 +72,7 @@ export interface Message {
   timestamp: string;
   mentions: string[]; // handles like ['@gemini', '@architect']
   toolExecutions?: ToolExecution[];
+  reasoningTrace?: string;
   architectureDiagram?: string; // Mermaid markdown diagram string
   attachedFiles?: string[];
   isStreaming?: boolean;

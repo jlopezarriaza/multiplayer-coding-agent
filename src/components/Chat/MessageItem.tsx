@@ -1,9 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Message } from '../../types/index.js';
 import { AgentToolCard } from './AgentToolCard.js';
 import { marked } from 'marked';
 import mermaid from 'mermaid';
-import { Copy, Check, Sparkles, User as UserIcon, Bot } from 'lucide-react';
+import { Copy, Check, Sparkles, Brain, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface MessageItemProps {
   message: Message;
@@ -23,7 +23,8 @@ mermaid.initialize({
 });
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onSelectDiagram }) => {
-  const [copied, setCopied] = React.useState(false);
+  const [copied, setCopied] = useState(false);
+  const [showReasoning, setShowReasoning] = useState(false);
   const diagramRef = useRef<HTMLDivElement>(null);
 
   const isAgent = message.sender.role === 'agent';
@@ -98,6 +99,26 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onSelectDiagr
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
         </div>
+
+        {/* Reasoning Trace (Collapsible) */}
+        {message.reasoningTrace && (
+          <div className="mt-2 font-mono text-xs">
+            <button
+              onClick={() => setShowReasoning(!showReasoning)}
+              className="flex items-center space-x-1 text-[11px] text-indigo-400 hover:text-indigo-300 transition"
+            >
+              {showReasoning ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <Brain className="w-3.5 h-3.5 text-indigo-400" />
+              <span>AGY Reasoning & Thought Trace</span>
+            </button>
+
+            {showReasoning && (
+              <div className="mt-1 p-2 bg-dark-950/90 rounded border border-indigo-500/20 text-slate-300 text-[11px] leading-relaxed whitespace-pre-wrap">
+                {message.reasoningTrace}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Streaming / Tool Executions */}
         {message.toolExecutions && message.toolExecutions.length > 0 && (
