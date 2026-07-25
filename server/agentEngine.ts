@@ -42,6 +42,27 @@ export const AVAILABLE_AGENTS: AgentInfo[] = [
   }
 ];
 
+class AgentQueueManager {
+  private queues: Map<string, Promise<void>> = new Map();
+
+  public enqueue<T>(agentHandle: string, task: () => Promise<T>): Promise<T> {
+    const previous = this.queues.get(agentHandle) || Promise.resolve();
+
+    let taskResult: T;
+    const next = previous.then(async () => {
+      taskResult = await task();
+    }).catch(err => {
+      console.error(`Error executing queued task for ${agentHandle}:`, err);
+    });
+
+    this.queues.set(agentHandle, next);
+
+    return next.then(() => taskResult);
+  }
+}
+
+export const agentQueueManager = new AgentQueueManager();
+
 // AGY Built-in Tool Declarations for Gemini Function Calling
 const AGY_TOOLS: FunctionDeclaration[] = [
   {
@@ -179,7 +200,18 @@ export class AgentEngine {
     return matched;
   }
 
-  public async processAgentResponse(
+  public processAgentResponse(
+    agent: AgentInfo,
+    userMessage: Message,
+    conversationHistory: Message[],
+    onUpdate: (partialMsg: Partial<Message>) => void
+  ): Promise<Message> {
+    return agentQueueManager.enqueue(agent.handle, () =>
+      this.executeAgentTurn(agent, userMessage, conversationHistory, onUpdate)
+    );
+  }
+
+  private async executeAgentTurn(
     agent: AgentInfo,
     userMessage: Message,
     conversationHistory: Message[],

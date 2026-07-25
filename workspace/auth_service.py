@@ -23,9 +23,13 @@ def create_access_token(data: dict):
     expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt to_encode = data.copy()
+    expire = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def decode_access_token(token: str):
+def verify_access_token(token: str):
     """Decodes and validates a JWT access token."""
     try:
         decoded_token = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -51,7 +55,7 @@ if __name__ == "__main__":
     token = create_access_token(user_data)
     print(f"Generated Token: {token}")
 
-    decoded = decode_access_token(token)
+    decoded = verify_access_token(token)
     print(f"Decoded Token: {decoded}")
 
     # Simulate an expired token (for demonstration, set ACCESS_TOKEN_EXPIRE_MINUTES to a very small number or manually create an old expiry)
@@ -64,9 +68,9 @@ if __name__ == "__main__":
     expired_payload.update({"exp": past_expire})
     expired_token = jwt.encode(expired_payload, SECRET_KEY, algorithm=ALGORITHM)
     print(f"Expired Token: {expired_token}")
-    print(f"Decoding Expired Token: {decode_access_token(expired_token)}")
+    print(f"Decoding Expired Token: {verify_access_token(expired_token)}")
 
     print("\n--- Simulating Invalid Token ---")
     invalid_token = token + "malicious_change"
     print(f"Invalid Token: {invalid_token}")
-    print(f"Decoding Invalid Token: {decode_access_token(invalid_token)}")
+    print(f"Decoding Invalid Token: {verify_access_token(invalid_token)}")
