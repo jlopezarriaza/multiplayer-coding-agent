@@ -22,7 +22,7 @@ export class WebSocketHandler {
     this.init();
   }
 
-  private seedRoomMessages(roomId: string) {
+  public seedRoomMessages(roomId: string) {
     const initialMessages: Message[] = [
       {
         id: 'msg-welcome-1',
@@ -40,6 +40,24 @@ export class WebSocketHandler {
       }
     ];
     this.messagesByRoom.set(roomId, initialMessages);
+  }
+
+  public clearRoomMessages(roomId: string = 'room-dev-1') {
+    this.seedRoomMessages(roomId);
+    this.broadcastToRoom(roomId, {
+      type: 'ROOM_STATE_SYNC',
+      payload: {
+        roomId,
+        messages: this.messagesByRoom.get(roomId) || [],
+        activeUsers: Array.from(this.activeUsersByRoom.get(roomId)?.values() || []),
+        files: fileSystemStore.getTree(),
+        allFileObjects: fileSystemStore.getAllFiles(),
+        repos: githubService.getRepos(),
+        commits: fileSystemStore.getCommits(),
+        availableAgents: AVAILABLE_AGENTS,
+        hasApiKey: !!agentEngine.getApiKey()
+      }
+    });
   }
 
   private init() {
@@ -139,13 +157,24 @@ export class WebSocketHandler {
               break;
             }
 
-            case 'UPDATE_FILE': {
-              const { path, content, user } = payload;
-              const roomId = clientConnection?.roomId || 'room-dev-1';
+            case 'TYPING_STATUS': {
+              const { roomId, isTyping } = payload;
+              if (clientConnection) {
+                this.broadcastToRoom(roomId, {
+                  type: 'USER_TYPING',
+                  payload: {
+                    user: clientConnection.user,
+                    isTyping
+                  }
+                }, ws);
+              }
+              break;
+            }
 
-              fileSystemStore.updateFile(path, content, user?.name || 'User');
-
-              this.broadcastToRoom(roomId, {
+            case 'CREATE_FILE': {
+              const { path, content, author } = payload;
+              fileSystemStore.updateFile(path, content || '', author || clientConnection?.user.name || 'User');
+              this.broadcastToRoom(payload.roomId || 'room-dev-1', {
                 type: 'WORKSPACE_FILES_UPDATE',
                 payload: {
                   files: fileSystemStore.getTree(),
@@ -156,36 +185,41 @@ export class WebSocketHandler {
               break;
             }
 
-            case 'ADD_GITHUB_REPO': {
-              const { owner, repo } = payload;
-              const roomId = clientConnection?.roomId || 'room-dev-1';
-
-              const newRepo: GitHubRepo = await githubService.fetchRepoDetails(owner, repo);
-
-              this.broadcastToRoom(roomId, {
-                type: 'REPOS_UPDATED',
-                payload: { repos: githubService.getRepos(), addedRepo: newRepo }
+            case 'UPDATE_FILE': {
+              const { path, content, author } = payload;
+              fileSystemStore.updateFile(path, content, author || clientConnection?.user.name || 'User');
+              this.broadcastToRoom(payload.roomId || 'room-dev-1', {
+                type: 'WORKSPACE_FILES_UPDATE',
+                payload: {
+                  files: fileSystemStore.getTree(),
+                  allFileObjects: fileSystemStore.getAllFiles(),
+                  commits: fileSystemStore.getCommits()
+                }
               });
               break;
             }
 
-            case 'SET_API_KEY': {
-              const { apiKey } = payload;
-              agentEngine.setApiKey(apiKey);
-              ws.send(JSON.stringify({
-                type: 'API_KEY_STATUS',
-                payload: { hasApiKey: !!apiKey }
-              }));
+            case 'DELETE_FILE': {
+              const { path } = payload;
+              fileSystemStore.deleteFile(path);
+              this.broadcastToRoom(payload.roomId || 'room-dev-1', {
+                type: 'WORKSPACE_FILES_UPDATE',
+                payload: {
+                  files: fileSystemStore.getTree(),
+                  allFileObjects: fileSystemStore.getAllFiles(),
+                  commits: fileSystemStore.getCommits()
+                }
+              });
               break;
             }
 
-            case 'TYPING_STATUS': {
-              const { user, isTyping } = payload;
-              const roomId = clientConnection?.roomId || 'room-dev-1';
-              this.broadcastToRoom(roomId, {
-                type: 'USER_TYPING',
-                payload: { user, isTyping }
-              }, ws); // exclude sender
+            case 'CONNECT_REPO': {
+              const { owner, repo, branch } = payload as GitHubRepo;
+              await githubService.fetchRepoDetails(owner, repo);
+              this.broadcastToRoom(payload.roomId || 'room-dev-1', {
+                type: 'REPOS_UPDATE',
+                payload: { repos: githubService.getRepos() }
+              });
               break;
             }
           }

@@ -19,7 +19,7 @@ app.use(express.json());
 const server = createServer(app);
 const wss = new WebSocketServer({ server, path: '/ws' });
 
-new WebSocketHandler(wss);
+const wsHandler = new WebSocketHandler(wss);
 
 // REST API Endpoints
 app.get('/api/health', (req, res) => {
@@ -48,6 +48,12 @@ app.post('/api/config/apikey', (req, res) => {
     return res.json({ success: true, hasApiKey: !!apiKey });
   }
   res.status(400).json({ error: 'Invalid API key format' });
+});
+
+app.post('/api/clear', (req, res) => {
+  const { roomId = 'room-dev-1' } = req.body || {};
+  wsHandler.clearRoomMessages(roomId);
+  res.json({ success: true, message: `Cleared room ${roomId}` });
 });
 
 // Serve static built frontend files in production/standalone mode
