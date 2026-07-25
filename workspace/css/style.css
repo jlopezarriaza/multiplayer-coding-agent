@@ -1,0 +1,128 @@
+:root {
+    --bg-color: #c3c3c3;
+    --border-color: #808080;
+    --button-bg-color: #e1e1e1;
+    --button-hover-bg-color: #f0f0f0;
+    --button-active-bg-color: #a0a0a0;
+    --text-color: #333;
+    --canvas-bg-color: white;
+}
+
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: var(--bg-color);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    background-color: var(--bg-color);
+    border: 2px solid var(--border-color);
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px;
+}
+
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    background-color: var(--bg-color);
+}
+
+.tool-group {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px;
+    border: 1px solid var(--border-color);
+    background-color: var(--button-bg-color);
+}
+
+.tool-button {
+    background-color: var(--button-bg-color);
+    border: 1px solid var(--border-color);
+    padding: 5px 10px;
+    cursor: pointer;
+    color: var(--text-color);
+    font-size: 0.9em;
+}
+
+.tool-button:hover {
+    background-color: var(--button-hover-bg-color);
+}
+
+.tool-button.active {
+    background-color: var(--button-active-bg-color);
+    border-color: var(--text-color);
+}
+
+canvas {
+    border: 1px solid var(--border-color);
+    background-color: var(--canvas-bg-color);
+    cursor: crosshair;
+}
+
+label {
+    color: var(--text-color);
+    font-size: 0.9em;
+}
+
+input[type="range"] {
+    width: 80px;
+}
+
+input[type="color"] {
+    border: none;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+}
+
+.color-swatch-group {
+    display: flex;
+    gap: 2px;
+}
+
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+}
+
+.color-swatch.active {
+    border: 2px solid var(--text-color);
+}
+
+/* Specific color swatches */
+.color-swatch.black { background-color: #000000; }
+.color-swatch.white { background-color: #ffffff; }
+.color-swatch.red { background-color: #ff0000; }
+.color-swatch.green { background-color: #00ff00; }
+.color-swatch.blue { background-color: #0000ff; }
+.color-swatch.yellow { background-color: #ffff00; }
+
+/* Text tool specific styling */
+.text-input {
+    position: absolute;
+    border: 1px dashed var(--text-color);
+    background: rgba(255, 255, 255, 0.8);
+    padding: 2px;
+    font-family: sans-serif; /* Use a default font for the input */
+    font-size: 16px; /* Default size, will be updated by tool */
+    color: var(--text-color);
+    z-index: 100;
+    resize: none;
+    overflow: hidden;
+}
+
