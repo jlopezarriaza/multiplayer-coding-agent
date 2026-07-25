@@ -319,8 +319,8 @@ AUTONOMOUS AGENT DIRECTIVES:
               const oldContent = existing.content;
               const newContent = oldContent.replace(args.target, args.replacement);
               fileSystemStore.updateFile(args.path, newContent, agent.name);
-              toolExec.diff = { path: args.path, oldContent, newContent };
-              toolResult = `Edited file '${args.path}'`;
+              toolExec.diff = { path: args.path, oldContent: args.target, newContent: args.replacement };
+              toolResult = `Successfully edited '${args.path}'`;
             } else {
               toolResult = `File '${args.path}' not found for edit`;
             }

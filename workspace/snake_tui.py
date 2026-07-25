@@ -18,6 +18,7 @@ COLOR_GREEN = "\033[92m"  # Snake
 COLOR_RED = "\033[91m"    # Food
 COLOR_BLUE = "\033[94m"   # Border
 COLOR_YELLOW = "\033[93m" # Score/Game Over
+COLOR_WALL = "\033[90m" # Obstacle Walls
 
 # Symbols
 SNAKE_HEAD = "O"
@@ -26,6 +27,7 @@ FOOD = "*"
 BORDER_HORIZONTAL = "-"
 BORDER_VERTICAL = "|"
 BORDER_CORNER = "+"
+WALL = "#"
 
 # --- Global Game State ---
 snake = []
@@ -35,6 +37,7 @@ direction = (0, 1)  # (row_change, col_change) - initially moving right
 game_over = False
 demo_mode = False
 frame_count = 0
+walls = [] # List of (row, col) for obstacle walls
 
 # --- Terminal Control Functions ---
 def clear_screen():
@@ -54,19 +57,29 @@ def show_cursor():
 
 # --- Game Logic Functions ---
 def initialize_game():
-    global snake, food, score, direction, game_over, frame_count
+    global snake, food, score, direction, game_over, frame_count, walls
     snake = [(GRID_HEIGHT // 2, GRID_WIDTH // 2 - i) for i in range(INITIAL_SNAKE_LENGTH)]
     direction = (0, 1) # Start moving right
     score = 0
     game_over = False
     frame_count = 0
+    
+    # Define some obstacle walls
+    walls = []
+    # Create a rectangular obstacle in the center
+    for r in range(GRID_HEIGHT // 2 - 3, GRID_HEIGHT // 2 + 3):
+        for c in range(GRID_WIDTH // 2 - 5, GRID_WIDTH // 2 + 5):
+            if (r == GRID_HEIGHT // 2 - 3 or r == GRID_HEIGHT // 2 + 2 or
+                c == GRID_WIDTH // 2 - 5 or c == GRID_WIDTH // 2 + 4):
+                walls.append((r, c))
+    
     spawn_food()
 
 def spawn_food():
     global food
     while True:
         new_food = (random.randint(1, GRID_HEIGHT - 2), random.randint(1, GRID_WIDTH - 2))
-        if new_food not in snake:
+        if new_food not in snake and new_food not in walls:
             food = new_food
             break
 
@@ -102,6 +115,13 @@ def draw_elements():
     sys.stdout.write(f"Score: {score}")
     sys.stdout.write(COLOR_RESET)
 
+def draw_walls():
+    sys.stdout.write(COLOR_WALL)
+    for r, c in walls:
+        set_cursor_position(r, c)
+        sys.stdout.write(WALL)
+    sys.stdout.write(COLOR_RESET)
+
 def update_game_state():
     global snake, food, score, direction, game_over
 
@@ -110,7 +130,7 @@ def update_game_state():
 
     # Check for collisions
     # Wall collision
-    if not (1 <= new_head[0] < GRID_HEIGHT - 1 and 1 <= new_head[1] < GRID_WIDTH - 1):
+    if not (1 <= new_head[0] < GRID_HEIGHT - 1 and 1 <= new_head[1] < GRID_WIDTH - 1) or new_head in walls:
         game_over = True
         return
     # Self-collision
@@ -158,7 +178,7 @@ def simulate_input():
         next_head = (head_r + ndr, head_c + ndc)
 
         # Check for wall collision
-        if not (1 <= next_head[0] < GRID_HEIGHT - 1 and 1 <= next_head[1] < GRID_WIDTH - 1):
+        if not (1 <= next_head[0] < GRID_HEIGHT - 1 and 1 <= next_head[1] < GRID_WIDTH - 1) or next_head in walls:
             continue
 
         # Check for self-collision (in next frame)
@@ -182,6 +202,7 @@ def game_loop():
     clear_screen()
     initialize_game()
     draw_grid()
+    draw_walls()
 
     while not game_over:
         if demo_mode:

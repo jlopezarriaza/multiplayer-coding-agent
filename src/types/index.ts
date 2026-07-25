@@ -46,7 +46,7 @@ export interface SharedFile {
 
 export interface ToolExecution {
   id: string;
-  toolName: 'read_file' | 'write_file' | 'search_code' | 'run_command' | 'git_commit' | 'create_branch' | 'fetch_github_repo';
+  toolName: string;
   status: 'running' | 'success' | 'failed';
   args: Record<string, any>;
   result?: string;
