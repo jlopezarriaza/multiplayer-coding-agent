@@ -3,6 +3,9 @@ import { fileSystemStore, WORKSPACE_DIR } from './fileSystemStore.js';
 import { githubService } from './githubService.js';
 import { GoogleGenAI, FunctionDeclaration, Type } from '@google/genai';
 import { exec } from 'child_process';
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 
 export const AVAILABLE_AGENTS: AgentInfo[] = [
   {
@@ -125,14 +128,41 @@ function executeRealShellCommand(command: string): Promise<string> {
   });
 }
 
+function loadEnvKey(): string {
+  if (process.env.GEMINI_API_KEY) return process.env.GEMINI_API_KEY;
+  try {
+    const homedir = os.homedir();
+    const envPaths = [
+      path.join(homedir, '.env'),
+      path.join(process.cwd(), '.env')
+    ];
+
+    for (const envPath of envPaths) {
+      if (fs.existsSync(envPath)) {
+        const content = fs.readFileSync(envPath, 'utf-8');
+        const match = content.match(/^GEMINI_API_KEY=(.*)$/m);
+        if (match && match[1]) {
+          return match[1].trim().replace(/^["']|["']$/g, '');
+        }
+      }
+    }
+  } catch (e) {
+    // Ignore read errors
+  }
+  return '';
+}
+
 export class AgentEngine {
-  private apiKey: string = process.env.GEMINI_API_KEY || '';
+  private apiKey: string = loadEnvKey();
 
   public setApiKey(key: string) {
     this.apiKey = key;
   }
 
   public getApiKey(): string {
+    if (!this.apiKey) {
+      this.apiKey = loadEnvKey();
+    }
     return this.apiKey;
   }
 
@@ -179,8 +209,10 @@ export class AgentEngine {
 
     onUpdate(messageState);
 
+    const activeKey = this.getApiKey();
+
     // Check if API key is provided
-    if (!this.apiKey) {
+    if (!activeKey) {
       messageState.content = `⚠️ **Gemini API Key Required**\n\nNo API key is configured for **${agent.handle}**. Click the **🔑 Set API Key** button in the top navbar or set the \`GEMINI_API_KEY\` environment variable to enable live LLM responses and tool execution.`;
       messageState.isStreaming = false;
       onUpdate(messageState);
@@ -189,7 +221,7 @@ export class AgentEngine {
 
     // Autonomous AGY Multi-Turn Execution Loop (Up to 10 Turns)
     try {
-      const ai = new GoogleGenAI({ apiKey: this.apiKey });
+      const ai = new GoogleGenAI({ apiKey: activeKey });
 
       const fileContextSnippet = workspaceFiles.length > 0
         ? workspaceFiles.map(f => `--- FILE: ${f.path} ---\n${f.content.slice(0, 800)}`).join('\n\n')
