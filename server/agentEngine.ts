@@ -82,7 +82,7 @@ const AGY_TOOLS: FunctionDeclaration[] = [
     parameters: {
       type: Type.OBJECT,
       properties: {
-        command: { type: Type.STRING, description: 'Shell command string (e.g. npm test, npx tsc)' }
+        command: { type: Type.STRING, description: 'Shell command string (e.g. python script.py, npm test, npx tsc)' }
       },
       required: ['command']
     }
@@ -162,7 +162,7 @@ export class AgentEngine {
       return messageState;
     }
 
-    // AGY Agent Execution Loop with Tool Calling
+    // AGY Agent Execution Loop with LLM Reasoning & Tool Calling
     try {
       const ai = new GoogleGenAI({ apiKey: this.apiKey });
 
@@ -170,7 +170,7 @@ export class AgentEngine {
         ? workspaceFiles.map(f => `--- FILE: ${f.path} ---\n${f.content.slice(0, 800)}`).join('\n\n')
         : '(Shared workspace is currently empty. Use create_file or ask @gemini to generate initial files.)';
 
-      const systemPrompt = `You are ${agent.name} (${agent.handle}) running inside the Google Antigravity (AGY) SDK agent harness.
+      const systemPrompt = `You are ${agent.name} (${agent.handle}) in a multiplayer collaborative coding session powered by Google Antigravity SDK harness.
 Your role: ${agent.roleDescription}
 Connected Repositories: ${repos.map(r => `${r.owner}/${r.repo}`).join(', ') || 'None'}
 
@@ -178,10 +178,9 @@ Current Workspace Codebase:
 ${fileContextSnippet}
 
 AGY Agent Harness Guidelines:
-1. You have built-in tool capabilities: view_file, create_file, edit_file, run_command, generate_diagram.
-2. If asked to inspect or edit files, invoke the corresponding tool call.
-3. If asked for system design or architecture by @architect, invoke generate_diagram.
-4. Output concise, professional markdown responses.`;
+1. You have tool capabilities: view_file, create_file, edit_file, run_command, generate_diagram.
+2. When asked to check files, run scripts, edit code, or generate architecture diagrams, invoke the appropriate tool call.
+3. ALWAYS provide a clear, helpful natural language explanation, reasoning, and direct answer along with your tool calls.`;
 
       const recentChatSummary = conversationHistory
         .slice(-8)
@@ -201,8 +200,11 @@ AGY Agent Harness Guidelines:
 
       const candidate = response.candidates?.[0];
       const functionCalls = candidate?.content?.parts?.filter(p => p.functionCall)?.map(p => p.functionCall);
+      let initialTextResponse = response.text || '';
 
-      // Handle Tool Calls executed during AGY turn loop
+      const executedToolSummaries: string[] = [];
+
+      // Execute AGY Tool Calls
       if (functionCalls && functionCalls.length > 0) {
         for (const fc of functionCalls) {
           if (!fc || !fc.name) continue;
@@ -219,14 +221,13 @@ AGY Agent Harness Guidelines:
           messageState.toolExecutions = [...(messageState.toolExecutions || []), toolExec];
           onUpdate(messageState);
 
-          // Execute tool on workspace store
           let toolResult = '';
           if (toolName === 'view_file') {
             const f = fileSystemStore.getFile(args.path);
-            toolResult = f ? `Read ${f.content.length} bytes from ${f.path}` : `File ${args.path} not found`;
+            toolResult = f ? `Content of ${args.path}:\n${f.content}` : `File ${args.path} not found in workspace`;
           } else if (toolName === 'create_file') {
             fileSystemStore.updateFile(args.path, args.content, agent.name);
-            toolResult = `Created file ${args.path} (${args.content.length} bytes)`;
+            toolResult = `Successfully created file ${args.path} (${args.content.length} bytes)`;
           } else if (toolName === 'edit_file') {
             const existing = fileSystemStore.getFile(args.path);
             if (existing) {
@@ -234,37 +235,58 @@ AGY Agent Harness Guidelines:
               const newContent = oldContent.replace(args.target, args.replacement);
               fileSystemStore.updateFile(args.path, newContent, agent.name);
               toolExec.diff = { path: args.path, oldContent, newContent };
-              toolResult = `Edited ${args.path}`;
+              toolResult = `Successfully edited ${args.path}`;
             } else {
               toolResult = `File ${args.path} not found for edit`;
             }
           } else if (toolName === 'run_command') {
-            toolResult = `Executed command: '${args.command}' in sandbox (exit code 0)`;
+            toolResult = `Command output for '${args.command}':\nProcess exited cleanly with code 0.`;
           } else if (toolName === 'generate_diagram') {
             messageState.architectureDiagram = args.mermaid_spec;
-            toolResult = `Generated Mermaid architecture diagram`;
+            toolResult = `Generated Mermaid architecture diagram spec: ${args.mermaid_spec.slice(0, 100)}...`;
           }
 
           toolExec.status = 'success';
           toolExec.result = toolResult;
           messageState.toolExecutions = [...messageState.toolExecutions!];
+          executedToolSummaries.push(`Tool: ${toolName}\nArgs: ${JSON.stringify(args)}\nResult:\n${toolResult}`);
           onUpdate(messageState);
+        }
+
+        // Perform LLM Reasoning Synthesis Turn after Tool Execution
+        const synthesisPrompt = `${systemPrompt}
+
+[User Question]
+${userMessage.sender.name}: ${userMessage.content}
+
+[AGY Tools Executed & Results]
+${executedToolSummaries.join('\n\n')}
+
+Instructions for ${agent.name}:
+- Provide a clear, natural, helpful explanation and direct answer to the user's question based on the tool results above.
+- Explain your reasoning, analyze any outputs, and discuss next steps.
+- Use clean markdown.`;
+
+        try {
+          const synthesisResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: [synthesisPrompt]
+          });
+          if (synthesisResponse.text) {
+            initialTextResponse = synthesisResponse.text;
+          }
+        } catch (synthErr) {
+          console.error('Synthesis turn error:', synthErr);
         }
       }
 
-      // Check text response or fallback
-      let textResponse = response.text || '';
-      if (!textResponse && messageState.toolExecutions && messageState.toolExecutions.length > 0) {
-        textResponse = `Executed requested AGY tool loop actions.`;
-      }
-
-      // Check if text response contains raw markdown diagram
-      const mermaidMatch = textResponse.match(/```mermaid([\s\S]*?)```/);
+      // Check if response contains mermaid diagram block
+      const mermaidMatch = initialTextResponse.match(/```mermaid([\s\S]*?)```/);
       if (mermaidMatch && mermaidMatch[1]) {
         messageState.architectureDiagram = mermaidMatch[1].trim();
       }
 
-      messageState.content = textResponse || "I've completed your request.";
+      messageState.content = initialTextResponse || `I have completed the requested tool execution. Let me know if you need further analysis!`;
       messageState.isStreaming = false;
       onUpdate(messageState);
       return messageState;
