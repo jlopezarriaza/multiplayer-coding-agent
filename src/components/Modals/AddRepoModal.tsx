@@ -19,10 +19,22 @@ export const AddRepoModal: React.FC<AddRepoModalProps> = ({ isOpen, onClose, onA
     let owner = 'jlopezarriaza';
     let repo = repoInput.trim();
 
-    if (repoInput.includes('/')) {
-      const parts = repoInput.split('/');
-      owner = parts[parts.length - 2];
-      repo = parts[parts.length - 1];
+    let cleanInput = repoInput.trim().replace(/\/+$/, '');
+    if (cleanInput.startsWith('http://') || cleanInput.startsWith('https://')) {
+      try {
+        const url = new URL(cleanInput);
+        const parts = url.pathname.split('/').filter(Boolean);
+        if (parts.length >= 2) {
+          owner = parts[0];
+          repo = parts[1];
+        }
+      } catch (e) {}
+    } else if (cleanInput.includes('/')) {
+      const parts = cleanInput.split('/').filter(Boolean);
+      if (parts.length >= 2) {
+        owner = parts[0];
+        repo = parts[1];
+      }
     }
 
     onAddRepo(owner, repo);

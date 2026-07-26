@@ -273,11 +273,47 @@ export class WebSocketHandler {
             }
 
             case 'CONNECT_REPO': {
-              const { owner, repo } = payload as GitHubRepo;
-              await githubService.fetchRepoDetails(owner, repo);
-              this.broadcastToRoom(payload.roomId || 'room-dev-1', {
+              const { owner, repo } = payload as { owner: string; repo: string; roomId?: string };
+              const targetRoom = payload.roomId || 'room-dev-1';
+              const fetchedRepo = await githubService.fetchRepoDetails(owner, repo);
+              await githubService.syncRepoFiles(fetchedRepo.owner, fetchedRepo.repo, fetchedRepo.defaultBranch);
+
+              this.broadcastToRoom(targetRoom, {
                 type: 'REPOS_UPDATE',
                 payload: { repos: githubService.getRepos() }
+              });
+
+              this.broadcastToRoom(targetRoom, {
+                type: 'WORKSPACE_FILES_UPDATE',
+                payload: {
+                  files: fileSystemStore.getTree(),
+                  allFileObjects: fileSystemStore.getAllFiles(),
+                  commits: fileSystemStore.getCommits()
+                }
+              });
+
+              const systemMsg: Message = {
+                id: `msg-repo-${Date.now()}`,
+                roomId: targetRoom,
+                sender: {
+                  id: 'user-system',
+                  name: 'GitHub Service',
+                  avatar: 'https://api.dicebear.com/7.x/identicon/svg?seed=github',
+                  role: 'agent',
+                  color: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                },
+                content: `🐙 **Successfully connected repository \`${fetchedRepo.owner}/${fetchedRepo.repo}\`!**\n\n- **Branch**: \`${fetchedRepo.defaultBranch}\`\n- **Stars**: ${fetchedRepo.stars} ⭐\n- **Files Synced**: Workspace populated with repository source code. Autonomous agents (\`@gemini\`, \`@architect\`, \`@reviewer\`, \`@debugger\`) now have full access to analyze and edit this codebase.`,
+                timestamp: new Date().toISOString(),
+                mentions: []
+              };
+
+              const roomMsgs = this.messagesByRoom.get(targetRoom) || [];
+              roomMsgs.push(systemMsg);
+              this.savePersistedMessages();
+
+              this.broadcastToRoom(targetRoom, {
+                type: 'NEW_MESSAGE',
+                payload: { message: systemMsg }
               });
               break;
             }
