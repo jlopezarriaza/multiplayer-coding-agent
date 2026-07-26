@@ -235,6 +235,18 @@ export function App() {
     setRightTab('architecture');
   };
 
+  const handleClearRoom = async () => {
+    try {
+      await fetch('/api/clear', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomId: 'room-dev-1' })
+      });
+    } catch (err) {
+      console.error('Failed to clear room:', err);
+    }
+  };
+
   return (
     <div className="h-screen w-screen flex flex-col bg-dark-950 overflow-hidden text-slate-100">
       {/* Top Navbar */}
@@ -242,6 +254,7 @@ export function App() {
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
         onEditProfile={() => setIsProfileModalOpen(true)}
+        onClearRoom={handleClearRoom}
         users={activeUsers}
         activeRepo={activeRepo}
         onOpenAddRepo={() => setIsAddRepoOpen(true)}

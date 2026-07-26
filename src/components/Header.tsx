@@ -11,13 +11,15 @@ import {
   CheckCircle2,
   Radio,
   UserCheck,
-  Edit3
+  Edit3,
+  Trash2
 } from 'lucide-react';
 
 interface HeaderProps {
   currentUser: User;
   onSwitchUser: (user: User) => void;
   onEditProfile: () => void;
+  onClearRoom: () => void;
   users: User[];
   activeRepo: GitHubRepo | null;
   onOpenAddRepo: () => void;
@@ -32,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onSwitchUser,
   onEditProfile,
+  onClearRoom,
   users,
   activeRepo,
   onOpenAddRepo,
@@ -42,6 +45,17 @@ export const Header: React.FC<HeaderProps> = ({
   hasApiKey
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [confirmingClear, setConfirmingClear] = useState(false);
+
+  const handleClearClick = () => {
+    if (confirmingClear) {
+      onClearRoom();
+      setConfirmingClear(false);
+    } else {
+      setConfirmingClear(true);
+      setTimeout(() => setConfirmingClear(false), 4000);
+    }
+  };
 
   return (
     <header className="h-16 border-b border-slate-800 bg-dark-900/90 backdrop-blur-md px-4 flex items-center justify-between z-30 select-none">
@@ -185,6 +199,20 @@ export const Header: React.FC<HeaderProps> = ({
         >
           <Key className="w-4 h-4" />
           <span className="hidden sm:inline">{hasApiKey ? 'API Key Active' : 'Set API Key'}</span>
+        </button>
+
+        {/* Clear Room Session Button */}
+        <button
+          onClick={handleClearClick}
+          className={`p-2 rounded-lg border text-xs font-medium flex items-center space-x-1.5 transition ${
+            confirmingClear
+              ? 'bg-rose-500/20 text-rose-300 border-rose-500/50 animate-pulse'
+              : 'bg-slate-900 text-slate-400 border-slate-800 hover:border-rose-500/40 hover:text-rose-400'
+          }`}
+          title="Clear room chat and start fresh"
+        >
+          <Trash2 className="w-4 h-4" />
+          <span className="hidden sm:inline">{confirmingClear ? 'Click to Confirm Reset' : 'Clear Fresh'}</span>
         </button>
 
         {/* Share Room Button */}
