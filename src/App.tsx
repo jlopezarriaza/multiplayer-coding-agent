@@ -171,8 +171,9 @@ export function App() {
           break;
         }
 
+        case 'REPOS_UPDATE':
         case 'REPOS_UPDATED':
-          setRepos(payload.repos);
+          setRepos(payload.repos || []);
           if (payload.addedRepo) setActiveRepo(payload.addedRepo);
           break;
 

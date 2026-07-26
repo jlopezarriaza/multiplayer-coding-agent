@@ -93,6 +93,7 @@ class WebSocketClient {
   }
 
   public addRepo(owner: string, repo: string) {
+    this.send('CONNECT_REPO', { owner, repo });
     this.send('ADD_GITHUB_REPO', { owner, repo });
   }
 
