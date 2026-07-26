@@ -45,6 +45,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --memory 512Mi \
   --cpu 1 \
   --timeout 300 \
+  --min-instances 1 \
   --max-instances 10 \
   --project ${PROJECT_ID}
 

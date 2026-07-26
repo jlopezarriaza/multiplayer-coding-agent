@@ -1,6 +1,8 @@
+import fs from 'fs';
+import path from 'path';
 import { WebSocket, WebSocketServer } from 'ws';
 import { Message, User, GitHubRepo } from '../src/types/index.js';
-import { fileSystemStore } from './fileSystemStore.js';
+import { fileSystemStore, WORKSPACE_DIR } from './fileSystemStore.js';
 import { githubService } from './githubService.js';
 import { agentEngine, AVAILABLE_AGENTS } from './agentEngine.js';
 
@@ -10,6 +12,8 @@ interface ClientConnection {
   roomId: string;
 }
 
+const STORE_PATH = path.join(WORKSPACE_DIR, '.messages_store.json');
+
 export class WebSocketHandler {
   private wss: WebSocketServer;
   private clients: Set<ClientConnection> = new Set();
@@ -18,8 +22,38 @@ export class WebSocketHandler {
 
   constructor(wss: WebSocketServer) {
     this.wss = wss;
-    this.seedRoomMessages('room-dev-1');
+    this.loadPersistedMessages('room-dev-1');
     this.init();
+  }
+
+  private loadPersistedMessages(roomId: string) {
+    if (fs.existsSync(STORE_PATH)) {
+      try {
+        const raw = fs.readFileSync(STORE_PATH, 'utf-8');
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed[roomId]) && parsed[roomId].length > 0) {
+          this.messagesByRoom.set(roomId, parsed[roomId]);
+          console.log(`💾 Restored ${parsed[roomId].length} messages from disk for ${roomId}`);
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to load persisted messages from disk:', err);
+      }
+    }
+    this.seedRoomMessages(roomId);
+  }
+
+  private savePersistedMessages() {
+    try {
+      fileSystemStore.ensureWorkspaceDir();
+      const storeObj: Record<string, Message[]> = {};
+      for (const [rId, msgs] of this.messagesByRoom.entries()) {
+        storeObj[rId] = msgs;
+      }
+      fs.writeFileSync(STORE_PATH, JSON.stringify(storeObj, null, 2), 'utf-8');
+    } catch (err) {
+      console.error('Failed to save messages to disk:', err);
+    }
   }
 
   public seedRoomMessages(roomId: string) {
@@ -40,10 +74,12 @@ export class WebSocketHandler {
       }
     ];
     this.messagesByRoom.set(roomId, initialMessages);
+    this.savePersistedMessages();
   }
 
   public clearRoomMessages(roomId: string = 'room-dev-1') {
     this.seedRoomMessages(roomId);
+    this.savePersistedMessages();
     this.broadcastToRoom(roomId, {
       type: 'ROOM_STATE_SYNC',
       payload: {
@@ -98,6 +134,7 @@ export class WebSocketHandler {
 
       roomMsgs.push(finalAgentMsg);
       this.messagesByRoom.set(roomId, roomMsgs);
+      this.savePersistedMessages();
 
       // Detect agent-to-agent mentions in the output content
       const nextAgents = agentEngine.detectMentions(finalAgentMsg.content).filter(a => a.handle !== agent.handle);
@@ -158,6 +195,7 @@ export class WebSocketHandler {
               const roomMsgs = this.messagesByRoom.get(roomId) || [];
               roomMsgs.push(message);
               this.messagesByRoom.set(roomId, roomMsgs);
+              this.savePersistedMessages();
 
               this.broadcastToRoom(roomId, {
                 type: 'NEW_MESSAGE',

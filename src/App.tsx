@@ -40,7 +40,13 @@ export function App() {
   const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [typingUsers, setTypingUsers] = useState<User[]>([]);
 
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem('agenty_room_messages_v1');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return [];
+  });
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [activeRepo, setActiveRepo] = useState<GitHubRepo | null>(null);
 
@@ -235,8 +241,18 @@ export function App() {
     setRightTab('architecture');
   };
 
+  useEffect(() => {
+    if (messages.length > 0) {
+      try {
+        localStorage.setItem('agenty_room_messages_v1', JSON.stringify(messages));
+      } catch (e) {}
+    }
+  }, [messages]);
+
   const handleClearRoom = async () => {
     try {
+      localStorage.removeItem('agenty_room_messages_v1');
+      setMessages([]);
       await fetch('/api/clear', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
