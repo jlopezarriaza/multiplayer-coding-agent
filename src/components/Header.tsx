@@ -10,12 +10,14 @@ import {
   Layers,
   CheckCircle2,
   Radio,
-  UserCheck
+  UserCheck,
+  Edit3
 } from 'lucide-react';
 
 interface HeaderProps {
   currentUser: User;
   onSwitchUser: (user: User) => void;
+  onEditProfile: () => void;
   users: User[];
   activeRepo: GitHubRepo | null;
   onOpenAddRepo: () => void;
@@ -29,6 +31,7 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({
   currentUser,
   onSwitchUser,
+  onEditProfile,
   users,
   activeRepo,
   onOpenAddRepo,
@@ -103,28 +106,46 @@ export const Header: React.FC<HeaderProps> = ({
           ))}
         </div>
 
-        {/* User Switcher Dropdown */}
+        {/* User Profile Button */}
         <div className="relative">
           <button
             onClick={() => setShowUserDropdown(!showUserDropdown)}
-            className="flex items-center space-x-2 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg px-2.5 py-1.5 transition text-xs"
+            className="flex items-center space-x-2.5 bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-lg px-3 py-1.5 transition text-xs"
           >
             <img
               src={currentUser.avatar}
               alt={currentUser.name}
               className="w-5 h-5 rounded-full ring-1 ring-indigo-500/50"
             />
-            <span className="font-medium text-slate-200 hidden sm:inline">{currentUser.name}</span>
+            <div className="text-left hidden sm:block">
+              <span className="font-medium text-slate-200 block leading-tight">{currentUser.name}</span>
+            </div>
             <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
           </button>
 
           {showUserDropdown && (
             <div className="absolute right-0 mt-2 w-64 glass-panel rounded-xl p-2 shadow-2xl z-50 border border-slate-800">
-              <div className="px-2 py-1.5 border-b border-slate-800/80 mb-1">
-                <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
-                  Switch Active Perspective
-                </p>
-                <p className="text-xs text-slate-400">Simulate multiple users in real-time</p>
+              <div className="px-2 py-1.5 border-b border-slate-800/80 mb-1 flex items-center justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+                    Your Profile
+                  </p>
+                  <p className="text-xs text-slate-200 font-medium">{currentUser.name}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowUserDropdown(false);
+                    onEditProfile();
+                  }}
+                  className="px-2 py-1 bg-brand-500/20 hover:bg-brand-500/30 text-brand-300 rounded border border-brand-500/30 text-[11px] font-medium transition flex items-center gap-1"
+                >
+                  <Edit3 className="w-3 h-3" />
+                  Edit Profile
+                </button>
+              </div>
+
+              <div className="px-2 py-1 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
+                Simulate Teammates
               </div>
 
               {users.map((u) => (

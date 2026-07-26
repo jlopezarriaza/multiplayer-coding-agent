@@ -13,6 +13,7 @@ import { GitDiffViewer } from './components/Workspace/GitDiffViewer.js';
 import { AddRepoModal } from './components/Modals/AddRepoModal.js';
 import { SettingsModal } from './components/Modals/SettingsModal.js';
 import { ShareRoomModal } from './components/Modals/ShareRoomModal.js';
+import { UserProfileModal } from './components/Modals/UserProfileModal.js';
 import { wsClient } from './services/websocket.js';
 import { SAMPLE_USERS } from './services/mockData.js';
 import {
@@ -29,7 +30,13 @@ import {
 } from 'lucide-react';
 
 export function App() {
-  const [currentUser, setCurrentUser] = useState<User>(SAMPLE_USERS[0]);
+  const [currentUser, setCurrentUser] = useState<User>(() => {
+    try {
+      const saved = localStorage.getItem('agenty_user_profile');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return SAMPLE_USERS[0];
+  });
   const [activeUsers, setActiveUsers] = useState<User[]>(SAMPLE_USERS);
   const [typingUsers, setTypingUsers] = useState<User[]>([]);
 
@@ -58,6 +65,9 @@ export function App() {
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isShareOpen, setIsShareOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(() => {
+    return !localStorage.getItem('agenty_user_profile');
+  });
 
   useEffect(() => {
     wsClient.connect(currentUser, 'room-dev-1');
@@ -200,6 +210,12 @@ export function App() {
     setCurrentUser(user);
   };
 
+  const handleSaveProfile = (updatedUser: User) => {
+    setCurrentUser(updatedUser);
+    localStorage.setItem('agenty_user_profile', JSON.stringify(updatedUser));
+    setIsProfileModalOpen(false);
+  };
+
   const handleSelectDiagramFromChat = (diagram: string) => {
     setSelectedDiagram(diagram);
     setRightTab('architecture');
@@ -211,6 +227,7 @@ export function App() {
       <Header
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
+        onEditProfile={() => setIsProfileModalOpen(true)}
         users={SAMPLE_USERS}
         activeRepo={activeRepo}
         onOpenAddRepo={() => setIsAddRepoOpen(true)}
@@ -398,6 +415,13 @@ export function App() {
       </div>
 
       {/* Modals */}
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onSave={handleSaveProfile}
+        currentUser={currentUser}
+        isInitialSetup={!localStorage.getItem('agenty_user_profile')}
+      />
+
       <AddRepoModal
         isOpen={isAddRepoOpen}
         onClose={() => setIsAddRepoOpen(false)}

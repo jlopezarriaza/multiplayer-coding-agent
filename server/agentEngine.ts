@@ -401,7 +401,12 @@ AUTONOMOUS AGENT DIRECTIVES:
 
     } catch (err: any) {
       console.error('Autonomous AGY Execution Error:', err);
-      messageState.content = `❌ **AGY Execution Error**: ${err?.message || 'Failed to process autonomous agent loop'}`;
+      const errStr = err?.message || String(err);
+      if (errStr.includes('leaked') || errStr.includes('API_KEY_INVALID') || errStr.includes('403')) {
+        messageState.content = `🔑 **Gemini API Key Expired or Revoked**\n\nGoogle AI Studio automatically revoked the active API key because it was detected in git commit history or public logs.\n\n**To Fix:** Click the **🔑 Set API Key** (or **API Key Active**) button in the top navbar to enter a fresh Gemini API key!`;
+      } else {
+        messageState.content = `❌ **AGY Execution Error**: ${errStr}`;
+      }
       messageState.isStreaming = false;
       onUpdate(messageState);
       return messageState;

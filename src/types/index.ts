@@ -1,6 +1,7 @@
 export interface User {
   id: string;
   name: string;
+  title?: string;
   avatar: string;
   role: 'human' | 'agent';
   color: string;
