@@ -78,6 +78,7 @@ export class WebSocketHandler {
   }
 
   public clearRoomMessages(roomId: string = 'room-dev-1') {
+    fileSystemStore.clearWorkspace();
     this.seedRoomMessages(roomId);
     this.savePersistedMessages();
     this.broadcastToRoom(roomId, {

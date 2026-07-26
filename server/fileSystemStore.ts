@@ -104,6 +104,20 @@ class FileSystemStore {
     return this.files.delete(relPath);
   }
 
+  public clearWorkspace() {
+    this.files.clear();
+    this.commits = [];
+    if (fs.existsSync(WORKSPACE_DIR)) {
+      const entries = fs.readdirSync(WORKSPACE_DIR);
+      for (const entry of entries) {
+        if (entry === '.gitkeep') continue;
+        const fullPath = path.join(WORKSPACE_DIR, entry);
+        fs.rmSync(fullPath, { recursive: true, force: true });
+      }
+    }
+    this.updateFile('README.md', '# Shared AGY Workspace\n\nWelcome to your clean collaborative AI coding workspace!\nTag `@gemini`, `@architect`, `@reviewer`, or `@debugger` to start.', 'System');
+  }
+
   public createGitCommit(message: string, author: string): GitCommitLog {
     const modifiedCount = Array.from(this.files.values()).filter(f => f.gitStatus !== 'unmodified').length;
     const commit: GitCommitLog = {
