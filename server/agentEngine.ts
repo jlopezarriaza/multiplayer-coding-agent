@@ -289,7 +289,7 @@ AUTONOMOUS AGENT DIRECTIVES:
       while (currentTurn < MAX_TURNS) {
         currentTurn++;
 
-        const primaryModel = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+        const primaryModel = process.env.GEMINI_MODEL || 'gemini-3.1-pro-preview';
         let response;
         try {
           response = await ai.models.generateContent({
@@ -302,19 +302,19 @@ AUTONOMOUS AGENT DIRECTIVES:
         } catch (mErr: any) {
           const errMsg = mErr?.message || String(mErr);
           if (mErr?.status === 404 || errMsg.includes('404') || errMsg.includes('not found') || errMsg.includes('no longer available')) {
-            console.warn(`⚠️ Model '${primaryModel}' unavailable (${errMsg.slice(0, 80)}...). Falling back to 'gemini-2.0-flash'...`);
+            console.warn(`⚠️ Model '${primaryModel}' unavailable (${errMsg.slice(0, 80)}...). Falling back to 'gemini-2.5-pro'...`);
             try {
               response = await ai.models.generateContent({
-                model: 'gemini-2.0-flash',
+                model: 'gemini-2.5-pro',
                 contents: conversationContents,
                 config: {
                   tools: [{ functionDeclarations: AGY_TOOLS }]
                 }
               });
             } catch (fallbackErr: any) {
-              console.warn(`⚠️ Fallback to gemini-2.0-flash failed, trying 'gemini-1.5-flash'...`);
+              console.warn(`⚠️ Fallback to gemini-2.5-pro failed, trying 'gemini-2.0-flash'...`);
               response = await ai.models.generateContent({
-                model: 'gemini-1.5-flash',
+                model: 'gemini-2.0-flash',
                 contents: conversationContents,
                 config: {
                   tools: [{ functionDeclarations: AGY_TOOLS }]
