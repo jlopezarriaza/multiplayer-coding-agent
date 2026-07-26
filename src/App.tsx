@@ -76,6 +76,15 @@ export function App() {
   });
 
   useEffect(() => {
+    const removeRogueMermaidErrors = () => {
+      document.querySelectorAll('#dmermaid, div[id^="dmermaid"], div[id^="mermaid-err"], .error-icon').forEach(el => el.remove());
+    };
+    removeRogueMermaidErrors();
+    const interval = setInterval(removeRogueMermaidErrors, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     wsClient.connect(currentUser, 'room-dev-1');
 
     const unsubscribe = wsClient.subscribe((event, payload) => {
