@@ -51,7 +51,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder={hasApiKey ? '••••••••••••••••••••••••••••' : 'Enter Gemini API Key (AIzaSy...)'}
+              placeholder={hasApiKey ? '••••••••••••••••••••••••••••' : 'Enter Gemini API Key'}
               className="w-full bg-dark-950 border border-slate-800 focus:border-indigo-500 rounded-xl px-3 py-2 text-slate-200 text-xs focus:outline-none"
             />
             <p className="text-[11px] text-slate-400 mt-1">

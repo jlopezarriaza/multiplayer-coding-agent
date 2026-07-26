@@ -10,7 +10,7 @@ const API_URL = 'http://localhost:3001/api/config/apikey';
 async function runHandoffTest() {
   console.log('🚀 Testing Agent-to-Agent Handoff Chain (@architect -> @gemini)...\n');
 
-  const apiKey = process.env.GEMINI_API_KEY || 'AIzaSyC9ud8bVb2bRGMzWCrIJNoPjWY7SyG7Gq4';
+  const apiKey = process.env.GEMINI_API_KEY || '';
   await fetch(API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
