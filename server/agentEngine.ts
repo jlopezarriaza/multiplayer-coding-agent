@@ -269,7 +269,8 @@ AUTONOMOUS AGENT DIRECTIVES:
 2. DO NOT just say what code to write — USE YOUR TOOLS to create files, execute scripts, check results, and fix any errors!
 3. IMPORTANT: When using edit_file, ensure the target string matches existing file content EXACTLY. If edit_file fails, use view_file to check exact contents or use create_file to overwrite the file cleanly.
 4. If a command fails or has a bug, inspect the error output, fix the file, and run_command again to verify the fix!
-5. Explain your reasoning clearly and summarize the final verified results for the team.`;
+5. MERMAID DIAGRAM RULES: When creating Mermaid diagrams, ALWAYS double-quote node labels containing special characters or parentheses (e.g. A["User (Client)"] --> B["Gateway"]).
+6. Explain your reasoning clearly and summarize the final verified results for the team.`;
 
       const recentChatSummary = conversationHistory
         .slice(-8)
@@ -421,7 +422,10 @@ AUTONOMOUS AGENT DIRECTIVES:
 
       const mermaidMatch = (messageState.content || '').match(/```mermaid([\s\S]*?)```/);
       if (mermaidMatch && mermaidMatch[1]) {
-        messageState.architectureDiagram = mermaidMatch[1].trim();
+        let spec = mermaidMatch[1].trim();
+        // Quote unquoted node labels with parentheses
+        spec = spec.replace(/\[\s*([^[\]"'\n]+?\([^[\]"'\n]+?\)[^[\]"'\n]*?)\s*\]/g, '["$1"]');
+        messageState.architectureDiagram = spec;
       }
 
       messageState.isStreaming = false;

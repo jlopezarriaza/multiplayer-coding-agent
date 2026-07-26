@@ -136,11 +136,16 @@ export class WebSocketHandler {
       this.messagesByRoom.set(roomId, roomMsgs);
       this.savePersistedMessages();
 
-      // Detect agent-to-agent mentions in the output content
-      const nextAgents = agentEngine.detectMentions(finalAgentMsg.content).filter(a => a.handle !== agent.handle);
-      if (nextAgents.length > 0) {
-        console.log(`🔄 Agent Handoff Chain (Depth ${depth + 1}): ${agent.handle} -> ${nextAgents.map(a => a.handle).join(', ')}`);
-        this.triggerAgentHandoffChain(nextAgents, finalAgentMsg, roomId, depth + 1);
+      // Detect explicit agent-to-agent handoff directives (e.g. "HANDOFF: @gemini", "@gemini please check", "DELEGATE: @architect")
+      const content = finalAgentMsg.content || '';
+      const hasExplicitHandoffIntent = /(HANDOFF:\s*@\w+|DELEGATE:\s*@\w+|NEXT:\s*@\w+|@\w+\s+please|@\w+\s+can you|@\w+\s+take over)/i.test(content);
+
+      if (hasExplicitHandoffIntent) {
+        const nextAgents = agentEngine.detectMentions(content).filter(a => a.handle !== agent.handle);
+        if (nextAgents.length > 0) {
+          console.log(`🔄 Explicit Agent Handoff (Depth ${depth + 1}): ${agent.handle} -> ${nextAgents.map(a => a.handle).join(', ')}`);
+          this.triggerAgentHandoffChain(nextAgents, finalAgentMsg, roomId, depth + 1);
+        }
       }
     }
   }

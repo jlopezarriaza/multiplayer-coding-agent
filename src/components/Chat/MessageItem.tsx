@@ -2,25 +2,13 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Message } from '../../types/index.js';
 import { AgentToolCard } from './AgentToolCard.js';
 import { marked } from 'marked';
-import mermaid from 'mermaid';
 import { Copy, Check, Sparkles, Brain, ChevronDown, ChevronRight } from 'lucide-react';
+import { safeRenderMermaid } from '../../utils/mermaidHelper.js';
 
 interface MessageItemProps {
   message: Message;
   onSelectDiagram?: (diagram: string) => void;
 }
-
-mermaid.initialize({
-  startOnLoad: false,
-  theme: 'dark',
-  securityLevel: 'loose',
-  themeVariables: {
-    fontFamily: 'Inter, sans-serif',
-    primaryColor: '#4f46e5',
-    primaryTextColor: '#fff',
-    lineColor: '#06b6d4',
-  }
-});
 
 export const MessageItem: React.FC<MessageItemProps> = ({ message, onSelectDiagram }) => {
   const [copied, setCopied] = useState(false);
@@ -31,20 +19,18 @@ export const MessageItem: React.FC<MessageItemProps> = ({ message, onSelectDiagr
 
   useEffect(() => {
     if (message.architectureDiagram && diagramRef.current) {
-      const renderId = `mermaid-${message.id.replace(/[^a-zA-Z0-9]/g, '')}`;
-      diagramRef.current.innerHTML = '';
-      mermaid.render(renderId, message.architectureDiagram).then((result) => {
-        if (diagramRef.current) {
-          diagramRef.current.innerHTML = result.svg;
-        }
-      }).catch((err) => {
-        console.error('Mermaid render error:', err);
-      });
+      safeRenderMermaid(diagramRef.current, message.architectureDiagram, `chat-${message.id.replace(/[^a-zA-Z0-9]/g, '')}`);
     }
   }, [message.architectureDiagram]);
 
   const renderContent = () => {
-    let rawHtml = marked.parse(message.content) as string;
+    // Strip mermaid codeblocks from body content if architectureDiagram is present to prevent double rendering
+    let textToParse = message.content || '';
+    if (message.architectureDiagram) {
+      textToParse = textToParse.replace(/```mermaid[\s\S]*?```/gi, '').trim();
+    }
+
+    let rawHtml = marked.parse(textToParse) as string;
 
     // Highlight @mentions in text
     rawHtml = rawHtml.replace(

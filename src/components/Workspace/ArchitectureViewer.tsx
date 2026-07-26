@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
-import mermaid from 'mermaid';
 import { Layers, Sparkles, Download, Maximize2 } from 'lucide-react';
+import { safeRenderMermaid, cleanMermaidSpec } from '../../utils/mermaidHelper.js';
 
 interface ArchitectureViewerProps {
   diagram: string | null;
@@ -29,15 +29,7 @@ export const ArchitectureViewer: React.FC<ArchitectureViewerProps> = ({ diagram 
 
   useEffect(() => {
     if (containerRef.current) {
-      const renderId = `mermaid-panel-${Date.now()}`;
-      containerRef.current.innerHTML = '';
-      mermaid.render(renderId, activeDiagram).then((res) => {
-        if (containerRef.current) {
-          containerRef.current.innerHTML = res.svg;
-        }
-      }).catch((err) => {
-        console.error('Architecture Mermaid render error:', err);
-      });
+      safeRenderMermaid(containerRef.current, activeDiagram, 'architecture-panel');
     }
   }, [activeDiagram]);
 
