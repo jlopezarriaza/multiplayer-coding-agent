@@ -71,8 +71,10 @@ app.get('*', (req, res, next) => {
   });
 });
 
-const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`⚡ Multiplayer Agent Server listening on http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket server active at ws://localhost:${PORT}/ws`);
+const PORT = Number(process.env.PORT) || 3001;
+const HOST = '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`⚡ Multiplayer Agent Server listening on http://${HOST}:${PORT}`);
+  console.log(`🔌 WebSocket server active at ws://${HOST}:${PORT}/ws`);
 });
