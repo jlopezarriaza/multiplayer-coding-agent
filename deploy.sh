@@ -10,7 +10,7 @@ SERVICE_NAME="multiplayer-coding-agent"
 REPO_NAME="multiplayer-coding-agent-repo"
 IMAGE_NAME="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPO_NAME}/${SERVICE_NAME}:latest"
 
-GEMINI_API_KEY="${GEMINI_API_KEY:-AIzaSyC9ud8bVb2bRGMzWCrIJNoPjWY7SyG7Gq4}"
+GEMINI_API_KEY="${GEMINI_API_KEY:-}"
 
 echo "🔑 Step 1: Ensuring GCP services are enabled..."
 gcloud services enable \

@@ -237,6 +237,19 @@ export class WebSocketHandler {
               });
               break;
             }
+
+            case 'SET_API_KEY': {
+              const { apiKey } = payload;
+              if (typeof apiKey === 'string') {
+                console.log('🔑 Dynamically updating Gemini API Key on server');
+                agentEngine.setApiKey(apiKey);
+                this.broadcastToRoom(clientConnection?.roomId || 'room-dev-1', {
+                  type: 'API_KEY_UPDATE',
+                  payload: { hasApiKey: !!apiKey }
+                });
+              }
+              break;
+            }
           }
         } catch (err) {
           console.error('Error handling WebSocket message:', err);

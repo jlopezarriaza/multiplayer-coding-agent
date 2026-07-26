@@ -15,7 +15,7 @@ import { SettingsModal } from './components/Modals/SettingsModal.js';
 import { ShareRoomModal } from './components/Modals/ShareRoomModal.js';
 import { UserProfileModal } from './components/Modals/UserProfileModal.js';
 import { wsClient } from './services/websocket.js';
-import { SAMPLE_USERS } from './services/mockData.js';
+import { DEFAULT_GUEST_USER } from './services/mockData.js';
 import {
   Folder,
   Github,
@@ -35,9 +35,9 @@ export function App() {
       const saved = localStorage.getItem('agenty_user_profile');
       if (saved) return JSON.parse(saved);
     } catch (e) {}
-    return SAMPLE_USERS[0];
+    return DEFAULT_GUEST_USER;
   });
-  const [activeUsers, setActiveUsers] = useState<User[]>(SAMPLE_USERS);
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [typingUsers, setTypingUsers] = useState<User[]>([]);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -139,6 +139,10 @@ export function App() {
           setActiveUsers(payload.activeUsers || []);
           break;
 
+        case 'API_KEY_UPDATE':
+          setHasApiKey(payload.hasApiKey || false);
+          break;
+
         case 'USER_TYPING': {
           const { user, isTyping } = payload;
           setTypingUsers((prev) => {
@@ -202,8 +206,18 @@ export function App() {
     wsClient.addRepo(owner, repo);
   };
 
-  const handleSaveApiKey = (apiKey: string) => {
+  const handleSaveApiKey = async (apiKey: string) => {
     wsClient.setApiKey(apiKey);
+    setHasApiKey(!!apiKey);
+    try {
+      await fetch('/api/config/apikey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey })
+      });
+    } catch (err) {
+      console.error('Failed to post /api/config/apikey:', err);
+    }
   };
 
   const handleSwitchUser = (user: User) => {
@@ -228,7 +242,7 @@ export function App() {
         currentUser={currentUser}
         onSwitchUser={handleSwitchUser}
         onEditProfile={() => setIsProfileModalOpen(true)}
-        users={SAMPLE_USERS}
+        users={activeUsers}
         activeRepo={activeRepo}
         onOpenAddRepo={() => setIsAddRepoOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
